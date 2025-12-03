@@ -1,0 +1,393 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>Terminal de Venta - Rendex POS</title>
+    <style>
+      body {
+        font-family: Arial;
+        padding: 12px;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Terminal de Venta</h1>
+    <div id="status">Cargando inventario...</div>
+    <div>
+      <label>Buscar: <input id="q" /></label>
+    </div>
+    <div id="results"></div>
+
+    <div style="margin-top: 12px">
+      <strong>Tasa activa (USD → VES): </strong><span id="current-rate">cargando...</span>
+    </div>
+
+    <div style="margin-top: 12px; border-top: 1px solid #ddd; padding-top: 12px">
+      <h2>Carrito</h2>
+      <div id="cart-items">(sin items)</div>
+      <div style="margin-top: 8px">
+        <strong>Total:</strong>
+        <span id="total-usd">0.00 USD</span>
+        &nbsp;|&nbsp;
+        <span id="total-ves">0.00 VES</span>
+        &nbsp;&nbsp;<button id="pay-button">Pagar</button>
+      </div>
+    </div>
+
+    <script>
+      // Load cached inventory
+      async function loadCache() {
+        try {
+          const r = await fetch('/api/inventory/cache');
+          const json = await r.json();
+          window.inventory = json || [];
+          document.getElementById(
+            'status'
+          ).textContent = `Inventario cargado: ${window.inventory.length} items`;
+          renderSearchResults(window.inventory.slice(0, 50));
+        } catch (e) {
+          document.getElementById('status').textContent = 'Error cargando inventario';
+          window.inventory = [];
+        }
+      }
+
+      function renderSearchResults(list) {
+        const out = list
+          .map(
+            (r) =>
+              `<div><strong>${r.sku}</strong> - ${r.name} - ${(r.price_usd_cents / 100).toFixed(
+                2
+              )} USD <button data-id="${r.id}">Agregar</button></div>`
+          )
+          .join('');
+        document.getElementById('results').innerHTML = out || '<i>sin resultados</i>';
+        // attach add handlers
+        Array.from(document.querySelectorAll('#results button[data-id]')).forEach((b) => {
+          b.addEventListener('click', () => {
+            const id = Number(b.getAttribute('data-id'));
+            const item = (window.inventory || []).find((x) => x.id === id);
+            if (item)
+              addToCart({
+                product_id: item.id,
+                sku: item.sku,
+                name: item.name,
+                unit_price_usd_cents: item.price_usd_cents,
+              });
+          });
+        });
+      }
+
+      loadCache();
+
+      document.getElementById('q').addEventListener('input', (e) => {
+        const q = e.target.value.toLowerCase();
+        const res = (window.inventory || []).filter(
+          (i) =>
+            (i.name || '').toLowerCase().includes(q) ||
+            (i.sku || '').includes(q) ||
+            (i.barcode || '').includes(q)
+        );
+        renderSearchResults(res.slice(0, 50));
+      });
+
+      // Cart and totals state
+      window.cart = [];
+      window.currentRate = null; // float rate
+      window.currentRateMicro = null; // integer micro-units (rate * 1e6)
+
+      function renderCart() {
+        const el = document.getElementById('cart-items');
+        if (!window.cart.length) {
+          el.innerHTML = '<i>(sin items)</i>';
+          return;
+        }
+        el.innerHTML = window.cart
+          .map(
+            (it, idx) =>
+              `<div>${it.sku} - ${it.name} x ${it.quantity} — ${(
+                it.unit_price_usd_cents / 100
+              ).toFixed(2)} USD <button data-idx="${idx}">Quitar</button></div>`
+          )
+          .join('');
+        // attach remove handlers
+        Array.from(el.querySelectorAll('button[data-idx]')).forEach((b) =>
+          b.addEventListener('click', () => {
+            const i = Number(b.getAttribute('data-idx'));
+            window.cart.splice(i, 1);
+            renderCart();
+            updateSaleTotals();
+          })
+        );
+      }
+
+      function addToCart(item) {
+        const found = window.cart.find(
+          (i) => i.product_id === item.product_id && i.variant_id === item.variant_id
+        );
+        if (found) {
+          found.quantity += 1;
+        } else {
+          window.cart.push(Object.assign({ quantity: 1 }, item));
+        }
+        renderCart();
+        updateSaleTotals();
+      }
+
+      // updateSaleTotals: recalcula Totales en USD y VES usando la tasa actual (micro-units)
+      function updateSaleTotals() {
+        const totalUsdCents = window.cart.reduce(
+          (s, it) => s + Number(it.unit_price_usd_cents) * Number(it.quantity),
+          0
+        );
+        const totalUsd = (totalUsdCents / 100).toFixed(2);
+        // compute VES using integer arithmetic: ves_cents = round(totalUsdCents * rate_micro / 1e6)
+        let vesCents = 0;
+        if (window.currentRateMicro) {
+          vesCents = Math.round((totalUsdCents * Number(window.currentRateMicro)) / 1e6);
+        }
+        const totalVes = (vesCents / 100).toFixed(2);
+        document.getElementById('total-usd').textContent = `${totalUsd} USD`;
+        document.getElementById('total-ves').textContent = `${totalVes} VES`;
+      }
+
+      // Socket.IO client: load library, connect and listen for rate updates
+      (function () {
+        const s = document.createElement('script');
+        s.src = '/socket.io/socket.io.js';
+        s.onload = () => {
+          try {
+            const socket = io();
+            socket.on('connect', () => console.log('socket connected', socket.id));
+            socket.on('rate:update', (data) => {
+              console.log('rate:update', data);
+              const el = document.getElementById('current-rate');
+              if (!el) return;
+              if (data && typeof data.rate !== 'undefined') {
+                window.currentRate = Number(data.rate);
+                window.currentRateMicro = Math.round(Number(data.rate) * 1e6);
+                el.textContent = Number(data.rate).toFixed(6) + ' VES/USD';
+              } else if (data && typeof data.micro !== 'undefined') {
+                window.currentRateMicro = Number(data.micro);
+                window.currentRate = Number(data.micro) / 1e6;
+                el.textContent = (Number(data.micro) / 1e6).toFixed(6) + ' VES/USD';
+              }
+              // call updateSaleTotals so UI recalculates using new rate
+              updateSaleTotals();
+            });
+          } catch (e) {
+            console.error('socket init failed', e);
+          }
+        };
+        document.head.appendChild(s);
+      })();
+
+      /* Payment modal and flow */
+      function createPaymentRow(method = 'EFECTIVO_USD', amount = '') {
+        const row = document.createElement('div');
+        row.className = 'payment-row';
+        row.style = 'margin:6px 0';
+        row.innerHTML = `
+              <select class="pay-method">
+                <option value="EFECTIVO_USD">EFECTIVO_USD</option>
+                <option value="TARJETA_LOCAL">TARJETA_LOCAL</option>
+                <option value="TRANSFERENCIA">TRANSFERENCIA</option>
+              </select>
+              <input class="pay-amount" type="number" step="0.01" placeholder="0.00" value="${amount}" style="margin-left:8px;width:120px" />
+              <button class="pay-remove" style="margin-left:8px">Quitar</button>
+            `;
+        row.querySelector('.pay-method').value = method;
+        row.querySelector('.pay-remove').addEventListener('click', () => {
+          row.remove();
+          recalcPayments();
+        });
+        row.querySelector('.pay-amount').addEventListener('input', () => recalcPayments());
+        row.querySelector('.pay-method').addEventListener('change', () => recalcPayments());
+        return row;
+      }
+
+      function openPaymentModal() {
+        let modal = document.getElementById('payment-modal');
+        if (!modal) {
+          modal = document.createElement('div');
+          modal.id = 'payment-modal';
+          modal.style =
+            'position:fixed;left:0;top:0;right:0;bottom:0;background:rgba(0,0,0,0.4);display:flex;align-items:center;justify-content:center;';
+          modal.innerHTML = `
+                <div style="background:#fff;padding:16px;min-width:360px;max-width:90%">
+                  <h3>Pagar</h3>
+                  <div>Total a pagar: <span id="modal-total-usd">0.00 USD</span> | <span id="modal-total-ves">0.00 VES</span></div>
+                  <div id="payments-list" style="margin-top:8px"></div>
+                  <div style="margin-top:8px">
+                    <button id="add-payment">Agregar Método</button>
+                  </div>
+                  <div style="margin-top:8px">Total Pagado: <span id="modal-paid-usd">0.00 USD</span> | <span id="modal-paid-ves">0.00 VES</span></div>
+                  <div>Faltante/Cambio: <span id="modal-diff-usd">0.00 USD</span> | <span id="modal-diff-ves">0.00 VES</span></div>
+                  <div style="margin-top:12px;text-align:right">
+                    <button id="modal-cancel">Cancelar</button>
+                    <button id="modal-confirm">Confirmar Pago</button>
+                  </div>
+                </div>
+              `;
+          document.body.appendChild(modal);
+          document.getElementById('add-payment').addEventListener('click', () => {
+            const row = createPaymentRow();
+            document.getElementById('payments-list').appendChild(row);
+            recalcPayments();
+          });
+          document.getElementById('modal-cancel').addEventListener('click', () => {
+            modal.remove();
+          });
+          document.getElementById('modal-confirm').addEventListener('click', onConfirmPayment);
+        }
+        document.getElementById('modal-total-usd').textContent =
+          document.getElementById('total-usd').textContent;
+        document.getElementById('modal-total-ves').textContent =
+          document.getElementById('total-ves').textContent;
+        const list = document.getElementById('payments-list');
+        list.innerHTML = '';
+        list.appendChild(createPaymentRow());
+        recalcPayments();
+      }
+
+      function recalcPayments() {
+        let paidUsdCents = 0;
+        let paidVesCents = 0;
+        const rows = document.querySelectorAll('#payments-list .payment-row');
+        rows.forEach((r) => {
+          const method = r.querySelector('.pay-method').value;
+          const amt = parseFloat(r.querySelector('.pay-amount').value || '0');
+          if (!amt) return;
+          if (method === 'EFECTIVO_USD') {
+            paidUsdCents += Math.round(amt * 100);
+          } else {
+            paidVesCents += Math.round(amt * 100);
+          }
+        });
+        document.getElementById('modal-paid-usd').textContent =
+          (paidUsdCents / 100).toFixed(2) + ' USD';
+        document.getElementById('modal-paid-ves').textContent =
+          (paidVesCents / 100).toFixed(2) + ' VES';
+
+        const totalUsdText = document.getElementById('total-usd').textContent.replace(' USD', '');
+        const totalUsdCents = Math.round(parseFloat(totalUsdText || '0') * 100);
+        let paidUnifiedUsdCents = paidUsdCents;
+        if (window.currentRateMicro && paidVesCents > 0) {
+          paidUnifiedUsdCents += Math.round((paidVesCents * 1e6) / Number(window.currentRateMicro));
+        }
+        const diffUsdCents = paidUnifiedUsdCents - totalUsdCents;
+        const diffUsd = (diffUsdCents / 100).toFixed(2);
+
+        let totalVesCents = 0;
+        if (window.currentRateMicro) {
+          totalVesCents = Math.round((totalUsdCents * Number(window.currentRateMicro)) / 1e6);
+        }
+        const diffVesCents =
+          paidVesCents +
+          (window.currentRateMicro
+            ? Math.round((paidUsdCents * Number(window.currentRateMicro)) / 1e6)
+            : 0) -
+          totalVesCents;
+        const diffVes = (diffVesCents / 100).toFixed(2);
+
+        document.getElementById('modal-diff-usd').textContent =
+          (diffUsdCents >= 0 ? '+' : '') + diffUsd + ' USD';
+        document.getElementById('modal-diff-ves').textContent =
+          (diffVesCents >= 0 ? '+' : '') + diffVes + ' VES';
+      }
+
+      async function onConfirmPayment() {
+        const items = window.cart.map((it) => ({
+          product_id: it.product_id,
+          variant_id: it.variant_id || null,
+          quantity_units: it.quantity,
+          unit_price_usd_cents: it.unit_price_usd_cents,
+        }));
+        const payments = [];
+        const rows = document.querySelectorAll('#payments-list .payment-row');
+        rows.forEach((r) => {
+          const method = r.querySelector('.pay-method').value;
+          const amt = parseFloat(r.querySelector('.pay-amount').value || '0');
+          if (!amt) return;
+          if (method === 'EFECTIVO_USD') {
+            payments.push({
+              method: 'EFECTIVO_USD',
+              amount_cents: Math.round(amt * 100),
+              currency: 'USD',
+            });
+          } else if (method === 'TARJETA_LOCAL') {
+            payments.push({
+              method: 'DEBITO_TARJETA',
+              amount_cents: Math.round(amt * 100),
+              currency: 'VES',
+            });
+          } else if (method === 'TRANSFERENCIA') {
+            payments.push({
+              method: 'PAGO_MOVIL',
+              amount_cents: Math.round(amt * 100),
+              currency: 'VES',
+            });
+          }
+        });
+
+        const token = localStorage.getItem('token');
+        let user_id = null;
+        try {
+          const pl = parseJwt(token);
+          user_id = pl && pl.user_id;
+        } catch (e) {}
+
+        const payload = { user_id, items, payments };
+
+        try {
+          const resp = await fetch('/api/ventas', {
+            method: 'POST',
+            headers: Object.assign(
+              { 'Content-Type': 'application/json' },
+              token ? { Authorization: 'Bearer ' + token } : {}
+            ),
+            body: JSON.stringify(payload),
+          });
+          const j = await resp.json();
+          if (resp.ok && j.ok) {
+            alert('Venta registrada: ' + (j.uuid || j.sale_id));
+            window.cart = [];
+            renderCart();
+            updateSaleTotals();
+            const modal = document.getElementById('payment-modal');
+            if (modal) modal.remove();
+            loadCache();
+          } else {
+            alert('Error al registrar venta: ' + (j.error || JSON.stringify(j)));
+          }
+        } catch (err) {
+          alert('Error de red al enviar venta: ' + err.message);
+        }
+      }
+
+      // helper to decode JWT payload (base64url)
+      function parseJwt(token) {
+        try {
+          if (!token) return null;
+          const parts = token.split('.');
+          if (parts.length !== 3) return null;
+          const payload = parts[1].replace(/-/g, '+').replace(/_/g, '/');
+          const pad = payload.length % 4 === 0 ? '' : '='.repeat(4 - (payload.length % 4));
+          const json = atob(payload + pad);
+          return JSON.parse(json);
+        } catch (e) {
+          return null;
+        }
+      }
+
+      document.addEventListener('click', (e) => {
+        if (e.target && e.target.id === 'pay-button') {
+          if (!window.cart.length) {
+            alert('Carrito vacío');
+            return;
+          }
+          openPaymentModal();
+        }
+      });
+    </script>
+  </body>
+</html>

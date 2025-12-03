@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>Configuración - Rendex POS</title>
+    <style>
+      body {
+        font-family: Arial;
+        padding: 12px;
+      }
+      label {
+        display: block;
+        margin: 8px 0;
+      }
+      input {
+        padding: 6px;
+        width: 200px;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Configuración</h1>
+    <div id="status"></div>
+
+    <div id="user-info" style="margin-bottom: 12px">
+      <strong id="username">No autenticado</strong>
+      <button id="logout" style="margin-left: 8px">Logout</button>
+    </div>
+
+    <div>
+      <label
+        >Tasa de Cambio (USD → VES): <input id="exchange_rate" type="number" step="0.000001"
+      /></label>
+      <button id="save">Guardar Tasa</button>
+    </div>
+
+    <script>
+      // helper: get token live from localStorage (fix: always read current token)
+      function getToken() {
+        return localStorage.getItem('token');
+      }
+      function authHeaders() {
+        const t = getToken();
+        return t
+          ? { Authorization: 'Bearer ' + t, 'Content-Type': 'application/json' }
+          : { 'Content-Type': 'application/json' };
+      }
+
+      // decode JWT to extract username (naive base64url decode)
+      function parseJwt(token) {
+        try {
+          const parts = token.split('.');
+          if (parts.length !== 3) return null;
+          const payload = parts[1].replace(/-/g, '+').replace(/_/g, '/');
+          const pad = payload.length % 4 === 0 ? '' : '='.repeat(4 - (payload.length % 4));
+          const json = atob(payload + pad);
+          return JSON.parse(json);
+        } catch (e) {
+          return null;
+        }
+      }
+
+      function showUserFromToken() {
+        const t = getToken();
+        const userEl = document.getElementById('username');
+        if (!t) {
+          userEl.textContent = 'No autenticado';
+          return;
+        }
+        const pl = parseJwt(t);
+        if (pl && (pl.user_id || pl.username || pl.role)) {
+          const name = pl.username || `user:${pl.user_id}` || 'usuario';
+          userEl.textContent = `${name} (${pl.role || '?'})`;
+        } else {
+          userEl.textContent = 'Autenticado';
+        }
+      }
+
+      async function loadSettings() {
+        try {
+          showUserFromToken();
+          const r = await fetch('/api/settings', { headers: authHeaders() });
+          if (r.status === 401) {
+            document.getElementById('status').textContent = 'No autenticado';
+            return;
+          }
+          const data = await r.json();
+          if (data.exchange_rate)
+            document.getElementById('exchange_rate').value = data.exchange_rate.value || '';
+          document.getElementById('status').textContent = 'Configuración cargada';
+        } catch (e) {
+          document.getElementById('status').textContent = 'Error cargando configuración';
+        }
+      }
+
+      document.getElementById('save').addEventListener('click', async () => {
+        const v = document.getElementById('exchange_rate').value;
+        try {
+          const r = await fetch('/api/settings', {
+            method: 'PUT',
+            headers: authHeaders(),
+            body: JSON.stringify({ key: 'exchange_rate', value: v }),
+          });
+          const j = await r.json();
+          if (r.ok) document.getElementById('status').textContent = 'Tasa guardada';
+          else document.getElementById('status').textContent = j.error || 'Error';
+        } catch (e) {
+          document.getElementById('status').textContent = 'Error guardando tasa';
+        }
+        showUserFromToken();
+      });
+
+      // Logout button
+      document.getElementById('logout').addEventListener('click', () => {
+        localStorage.removeItem('token');
+        showUserFromToken();
+        location.reload();
+      });
+
+      // init
+      showUserFromToken();
+      loadSettings();
+    </script>
+  </body>
+</html>
