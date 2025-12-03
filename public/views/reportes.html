@@ -45,6 +45,12 @@
               Generar Reporte
             </button>
             <button
+              id="exportCsv"
+              class="bg-green-600 text-white px-4 py-2 rounded-md shadow hover:bg-green-700"
+            >
+              Exportar CSV
+            </button>
+            <button
               id="reset"
               class="bg-white border border-gray-200 px-4 py-2 rounded-md hover:bg-gray-50"
             >
@@ -81,6 +87,9 @@
         return t ? { Authorization: 'Bearer ' + t } : {};
       }
 
+      let lastResponse = null;
+      let lastParams = null;
+
       document.getElementById('generate').addEventListener('click', async () => {
         const s = document.getElementById('startDate').value;
         const e = document.getElementById('endDate').value;
@@ -105,12 +114,76 @@
             status.textContent = j.error || 'Error al generar reporte';
             return;
           }
+          lastResponse = j;
+          lastParams = { startDate: s, endDate: e };
           document.getElementById('total-usd').textContent = j.total_sales_usd + ' USD';
           document.getElementById('total-ves').textContent = j.total_sales_ves + ' VES';
           document.getElementById('count').textContent = j.count_of_transactions;
           status.textContent = 'Reporte generado.';
         } catch (err) {
           status.textContent = 'Error de red: ' + err.message;
+        }
+      });
+
+      document.getElementById('exportCsv').addEventListener('click', () => {
+        const status = document.getElementById('status');
+        if (!lastResponse || !lastParams) {
+          status.textContent = 'Genere un reporte antes de exportar.';
+          return;
+        }
+        try {
+          const rows = [];
+          rows.push([
+            'Reporte de Ventas',
+            'Desde',
+            lastParams.startDate,
+            'Hasta',
+            lastParams.endDate,
+          ]);
+          rows.push(['Total USD', lastResponse.total_sales_usd]);
+          rows.push(['Total VES', lastResponse.total_sales_ves]);
+          rows.push(['Transacciones', lastResponse.count_of_transactions]);
+          rows.push([]);
+          if (Array.isArray(lastResponse.transactions) && lastResponse.transactions.length) {
+            const tx = lastResponse.transactions;
+            const headers = Object.keys(tx[0]);
+            rows.push(headers);
+            for (const t of tx) {
+              rows.push(
+                headers.map((h) => (t[h] !== undefined && t[h] !== null ? String(t[h]) : ''))
+              );
+            }
+          }
+
+          const csv = rows
+            .map((r) =>
+              r
+                .map((cell) => {
+                  if (
+                    typeof cell === 'string' &&
+                    (cell.includes(',') || cell.includes('"') || cell.includes('\n'))
+                  ) {
+                    return '"' + cell.replace(/"/g, '""') + '"';
+                  }
+                  return cell;
+                })
+                .join(',')
+            )
+            .join('\n');
+
+          const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+          const fname = `reportes-${lastParams.startDate}_${lastParams.endDate}.csv`;
+          const link = document.createElement('a');
+          const url = window.URL.createObjectURL(blob);
+          link.setAttribute('href', url);
+          link.setAttribute('download', fname);
+          document.body.appendChild(link);
+          link.click();
+          document.body.removeChild(link);
+          window.URL.revokeObjectURL(url);
+          status.textContent = 'CSV descargado.';
+        } catch (err) {
+          status.textContent = 'Error generando CSV: ' + err.message;
         }
       });
 
@@ -121,6 +194,8 @@
         document.getElementById('total-ves').textContent = '-';
         document.getElementById('count').textContent = '-';
         document.getElementById('status').textContent = '';
+        lastResponse = null;
+        lastParams = null;
       });
     </script>
   </body>
