@@ -15,6 +15,9 @@ const io = new Server(server, {
 
 app.use(bodyParser.json());
 
+// Serve static files from `public/` at the web root
+app.use(express.static(path.join(__dirname, '..', 'public')));
+
 // Static views
 app.use('/public', express.static(path.resolve(__dirname, '..', 'public')));
 
@@ -48,8 +51,7 @@ io.on('connection', (socket) => {
 // Basic server start (only when run directly)
 const PORT = process.env.PORT || 3000;
 if (require.main === module) {
-  server.listen(PORT, () => {
-  });
+  server.listen(PORT, () => {});
 }
 
 module.exports = { app, server, io };
