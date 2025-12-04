@@ -52,6 +52,7 @@
     "**/*.{json,md,html}": [
       "prettier --write",
       "git add"
-    ]
+    ],
+    "!public/vendor/**": []
   }
 }
