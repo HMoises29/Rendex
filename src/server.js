@@ -23,6 +23,7 @@ const { knex } = require('./db');
 app.use('/api/auth', require('./routes/auth'));
 app.use('/api/ventas', require('./routes/ventas'));
 app.use('/api/settings', require('./routes/settings'));
+app.use('/api/reports', require('./routes/reports'));
 
 // Inventory cache (simple cache endpoint)
 app.get('/api/inventory/cache', async (req, res) => {
