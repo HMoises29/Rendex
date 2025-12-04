@@ -67,7 +67,6 @@ router.put('/', authenticate, authorize(['admin', 'moderador']), async (req, res
     if (key === 'exchange_rate' && io) {
       const rateFloat = Number(value);
       io.emit('rate:update', { rate: rateFloat, micro: value_number });
-      console.log('Emitted rate:update', { rate: rateFloat, micro: value_number });
     }
 
     res.json({ ok: true, key, value, value_number });

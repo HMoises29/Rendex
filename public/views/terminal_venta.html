@@ -3,15 +3,46 @@
   <head>
     <meta charset="utf-8" />
     <title>Terminal de Venta - Rendex POS</title>
+    <script src="https://cdn.tailwindcss.com"></script>
     <style>
-      body {
-        font-family: Arial;
-        padding: 12px;
-      }
+      body { font-family: Inter, ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial; }
     </style>
   </head>
-  <body>
-    <h1>Terminal de Venta</h1>
+  <body class="bg-gray-50 min-h-screen p-6">
+    <script>
+      // Autenticación: si no hay token, redirige a login
+      (function() {
+        try {
+          const t = localStorage.getItem('token');
+          if (!t) {
+            window.location.href = '/public/views/login.html';
+          }
+        } catch (e) {
+          window.location.href = '/public/views/login.html';
+        }
+      })();
+    </script>
+
+    <header class="bg-white shadow mb-6">
+      <div class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div class="flex justify-between items-center py-4">
+          <div class="flex items-center gap-4">
+            <a href="/public/views/dashboard.html" class="text-xl font-semibold text-gray-800">Rendex POS</a>
+            <nav class="hidden md:flex items-center gap-2">
+              <a href="/public/views/terminal_venta.html" class="px-3 py-2 rounded-md text-sm font-medium text-gray-600 hover:bg-gray-100">Terminal</a>
+              <a href="/public/views/reportes.html" class="px-3 py-2 rounded-md text-sm font-medium text-gray-600 hover:bg-gray-100">Reportes</a>
+              <a href="/public/views/settings.html" class="px-3 py-2 rounded-md text-sm font-medium text-gray-600 hover:bg-gray-100">Configuración</a>
+            </nav>
+          </div>
+          <div class="flex items-center gap-4">
+            <button id="logoutBtn" class="bg-red-600 text-white px-3 py-2 rounded-md text-sm hover:bg-red-700">Cerrar sesión</button>
+          </div>
+        </div>
+      </div>
+    </header>
+
+    <div class="max-w-6xl mx-auto">
+      <h1 class="text-2xl font-semibold mb-3">Terminal de Venta</h1>
     <div id="status">Cargando inventario...</div>
     <div>
       <label>Buscar: <input id="q" /></label>
@@ -35,6 +66,14 @@
     </div>
 
     <script>
+      // logout handler
+      document.addEventListener('click', function (e) {
+        if (e.target && e.target.id === 'logoutBtn') {
+          try { localStorage.removeItem('token'); } catch (err) {}
+          window.location.href = '/public/views/login.html';
+        }
+      });
+
       // Load cached inventory
       async function loadCache() {
         try {

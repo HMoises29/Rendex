@@ -42,15 +42,13 @@ app.get('/health', (req, res) => res.json({ ok: true, ts: new Date().toISOString
 // Attach io to app for routes/services and register connection handlers
 app.set('io', io);
 io.on('connection', (socket) => {
-  console.log('Socket.IO connected:', socket.id);
-  socket.on('disconnect', () => console.log('Socket.IO disconnected:', socket.id));
+  socket.on('disconnect', () => {});
 });
 
 // Basic server start (only when run directly)
 const PORT = process.env.PORT || 3000;
 if (require.main === module) {
   server.listen(PORT, () => {
-    console.log(`Rendex POS server listening on port ${PORT}`);
   });
 }
 

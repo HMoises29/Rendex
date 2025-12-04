@@ -7,9 +7,11 @@
     "start": "node src/server.js",
     "dev": "NODE_ENV=development node src/server.js",
     "test": "mocha --exit",
+    "test:e2e": "npx playwright test",
     "lint": "eslint \"**/*.js\" --quiet",
     "format": "prettier --write \"**/*.{js,json,md,html}\"",
     "prepare": "husky install",
+    "create-admin": "node scripts/createAdmin.js",
     "migrate": "npx knex migrate:latest --knexfile knexfile.js",
     "migrate:rollback": "npx knex migrate:rollback --knexfile knexfile.js",
     "db:backup": "node scripts/dbBackup.js",
@@ -31,15 +33,24 @@
     "socket.io-client": "^4.8.1",
     "sqlite3": "^5.1.6",
     "uuid": "^13.0.0"
+    ,
+    "csv-stringify": "^6.0.5"
   },
   "devDependencies": {
     "chai": "^4.3.7",
     "eslint": "^8.40.0",
     "eslint-config-prettier": "^9.0.0",
     "mocha": "^10.2.0",
+    "playwright": "^1.37.0",
+    "@playwright/test": "^1.37.0",
+    "undici": "^6.2.5",
     "prettier": "^2.8.8",
     "supertest": "^6.3.3"
   },
+  "playwright": {
+    "browsers": ["chromium"]
+  }
+  ,
   "husky": {
     "hooks": {}
   },

@@ -13,6 +13,38 @@
     </style>
   </head>
   <body class="bg-gray-50 min-h-screen p-6">
+    <script>
+      // Autenticación: si no hay token, redirige a login
+      (function() {
+        try {
+          const t = localStorage.getItem('token');
+          if (!t) {
+            window.location.href = '/public/views/login.html';
+          }
+        } catch (e) {
+          window.location.href = '/public/views/login.html';
+        }
+      })();
+    </script>
+
+    <header class="bg-white shadow mb-6">
+      <div class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div class="flex justify-between items-center py-4">
+          <div class="flex items-center gap-4">
+            <a href="/public/views/dashboard.html" class="text-xl font-semibold text-gray-800">Rendex POS</a>
+            <nav class="hidden md:flex items-center gap-2">
+              <a href="/public/views/index.html" class="px-3 py-2 rounded-md text-sm font-medium text-gray-600 hover:bg-gray-100">Terminal</a>
+              <a href="/public/views/reportes.html" class="px-3 py-2 rounded-md text-sm font-medium text-gray-600 hover:bg-gray-100">Reportes</a>
+              <a href="/public/views/settings.html" class="px-3 py-2 rounded-md text-sm font-medium text-gray-600 hover:bg-gray-100">Configuración</a>
+            </nav>
+          </div>
+          <div class="flex items-center gap-4">
+            <button id="logoutBtn" class="bg-red-600 text-white px-3 py-2 rounded-md text-sm hover:bg-red-700">Cerrar sesión</button>
+          </div>
+        </div>
+      </div>
+    </header>
+
     <div class="max-w-5xl mx-auto">
       <header class="mb-6">
         <h1 class="text-3xl font-semibold text-gray-800">Reportes de Ventas</h1>
@@ -76,12 +108,50 @@
         </div>
       </section>
 
+      <section class="bg-white shadow rounded-lg p-6 mt-6">
+        <h2 class="text-lg font-medium text-gray-700 mb-3">Ventas por día</h2>
+        <canvas id="sales-chart" width="800" height="300" class="mb-3"></canvas>
+        <div class="flex gap-2 items-center">
+          <button id="downloadChart" class="bg-blue-600 text-white px-3 py-1 rounded-md">Descargar PNG</button>
+        </div>
+      </section>
+
+      <section class="bg-white shadow rounded-lg p-6 mt-6">
+        <h2 class="text-lg font-medium text-gray-700 mb-3">Transacciones</h2>
+        <div class="overflow-auto">
+          <table id="transactions-table" class="min-w-full text-sm">
+            <thead class="bg-gray-100">
+              <tr>
+                <th class="px-3 py-2 text-left">UUID</th>
+                <th class="px-3 py-2 text-left">Total USD (cents)</th>
+                <th class="px-3 py-2 text-left">Total VES (cents)</th>
+                <th class="px-3 py-2 text-left">Tasa (micro)</th>
+                <th class="px-3 py-2 text-left">Fecha</th>
+              </tr>
+            </thead>
+            <tbody id="transactions-body"></tbody>
+          </table>
+        </div>
+      </section>
+
       <footer class="mt-8 text-sm text-gray-500">
         Tip: usa el token de sesión en `localStorage.token` (debes estar autenticado).
       </footer>
     </div>
 
     <script>
+      // load Chart.js from local vendor for offline use
+    </script>
+    <script src="/vendor/chart.min.js"></script>
+    <script>
+      // logout handler
+      document.addEventListener('click', function (e) {
+        if (e.target && e.target.id === 'logoutBtn') {
+          try { localStorage.removeItem('token'); } catch (err) {}
+          window.location.href = '/public/views/login.html';
+        }
+      });
+
       function authHeaders() {
         const t = localStorage.getItem('token');
         return t ? { Authorization: 'Bearer ' + t } : {};
@@ -120,6 +190,35 @@
           document.getElementById('total-ves').textContent = j.total_sales_ves + ' VES';
           document.getElementById('count').textContent = j.count_of_transactions;
           status.textContent = 'Reporte generado.';
+
+          // fetch transactions (first page) and render table + chart
+          try {
+            const txResp = await fetch(
+              '/api/reports/sales-detail?' + new URLSearchParams({ startDate: s, endDate: e, limit: 1000, offset: 0 }).toString(),
+              { headers: Object.assign({ 'Content-Type': 'application/json' }, authHeaders()) }
+            );
+            if (txResp.ok) {
+              const txJson = await txResp.json();
+              const txRows = Array.isArray(txJson.rows) ? txJson.rows : [];
+              lastResponse.transactions = txRows;
+              const tbody = document.getElementById('transactions-body');
+              tbody.innerHTML = '';
+              for (const r of txRows) {
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                  <td class="px-3 py-2">${r.uuid}</td>
+                  <td class="px-3 py-2">${r.total_usd_cents}</td>
+                  <td class="px-3 py-2">${r.total_ves_calculated}</td>
+                  <td class="px-3 py-2">${r.tasa_usd_registrada_micro}</td>
+                  <td class="px-3 py-2">${r.created_at}</td>
+                `;
+                tbody.appendChild(tr);
+              }
+              renderSalesChart(txRows);
+            }
+          } catch (err) {
+            console.error('Error fetching transactions for chart', err);
+          }
         } catch (err) {
           status.textContent = 'Error de red: ' + err.message;
         }
@@ -196,6 +295,50 @@
         document.getElementById('status').textContent = '';
         lastResponse = null;
         lastParams = null;
+      });
+      
+      // render chart helper
+      let salesChart = null;
+      function aggregateSalesByDay(rows) {
+        const map = {};
+        for (const r of rows) {
+          const d = (r.created_at || '').split(' ')[0] || r.created_at;
+          if (!d) continue;
+          map[d] = (map[d] || 0) + (Number(r.total_usd_cents || 0) / 100);
+        }
+        const labels = Object.keys(map).sort();
+        const data = labels.map((l) => map[l]);
+        return { labels, data };
+      }
+
+      function renderSalesChart(rows) {
+        try {
+          const ctx = document.getElementById('sales-chart').getContext('2d');
+          const agg = aggregateSalesByDay(rows);
+          if (salesChart) salesChart.destroy();
+          salesChart = new Chart(ctx, {
+            type: 'line',
+            data: {
+              labels: agg.labels,
+              datasets: [{ label: 'Ventas USD', data: agg.data, fill: false, borderColor: '#2563EB' }],
+            },
+            options: { responsive: true, maintainAspectRatio: false },
+          });
+        } catch (e) {
+          console.error('chart render error', e);
+        }
+      }
+
+      document.getElementById('downloadChart').addEventListener('click', () => {
+        const canvas = document.getElementById('sales-chart');
+        if (!canvas) return;
+        const url = canvas.toDataURL('image/png');
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `chart-${new Date().toISOString()}.png`;
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
       });
     </script>
   </body>
