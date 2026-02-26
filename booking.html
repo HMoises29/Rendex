@@ -156,8 +156,14 @@
                 VOLTIO SOLUCIONES
                 <span style="color: var(--primary);">Certificados y Asegurados</span>
             </a>
+            <div class="menu-toggle" id="mobile-menu">
+                <span></span>
+                <span></span>
+                <span></span>
+            </div>
             <div class="nav-links">
-                <a href="index.html" style="color: white; text-decoration: none; font-weight: 600;">VOLVER AL INICIO</a>
+                <a href="index.html" style="color: white; text-decoration: none; font-weight: 600;">VOLVER AL
+                    INICIO</a>
             </div>
         </div>
     </nav>
@@ -194,7 +200,7 @@
                     </div>
 
                     <form id="booking-form" autocomplete="off">
-                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 2rem;">
+                        <div class="form-grid">
                             <div class="custom-input-group">
                                 <label>Nombre o Empresa</label>
                                 <input type="text" id="name" class="custom-input" required
@@ -219,7 +225,7 @@
                             </select>
                         </div>
 
-                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 2rem;">
+                        <div class="form-grid">
                             <div class="custom-input-group">
                                 <label>Fecha Sugerida</label>
                                 <input type="text" id="date" class="custom-input" required
@@ -243,6 +249,7 @@
 
     <script src="js/supabase-config.js"></script>
     <script src="js/booking.js"></script>
+    <script src="js/mobile-nav.js"></script>
     <script src="js/scroll-reveal.js"></script>
 </body>
 
