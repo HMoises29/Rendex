@@ -1,0 +1,269 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Panel de Administración | Voltio Soluciones</title>
+    <link rel="stylesheet" href="css/style.css">
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <style>
+        .admin-page {
+            background: #f4f7f6;
+            min-height: 100vh;
+        }
+
+        .dashboard-header {
+            background: var(--dark);
+            color: white;
+            padding: 4rem 0 8rem 0;
+            clip-path: polygon(0 0, 100% 0, 100% 85%, 0 100%);
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1.5rem;
+            margin-top: -5rem;
+            margin-bottom: 3rem;
+        }
+
+        .stat-card {
+            background: white;
+            padding: 2rem;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.05);
+            border-bottom: 4px solid var(--primary);
+            text-align: center;
+        }
+
+        .stat-card h4 {
+            font-size: 0.8rem;
+            text-transform: uppercase;
+            color: #777;
+            margin-bottom: 0.5rem;
+        }
+
+        .stat-card .value {
+            font-size: 2rem;
+            font-weight: 800;
+            color: var(--dark);
+        }
+
+        .data-container {
+            background: white;
+            padding: 2rem;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.05);
+            margin-bottom: 4rem;
+        }
+
+        .table-responsive {
+            overflow-x: auto;
+        }
+
+        .booking-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        .booking-table th {
+            text-align: left;
+            padding: 1rem;
+            background: #f8f9fa;
+            color: var(--dark);
+            font-weight: 700;
+            text-transform: uppercase;
+            font-size: 0.75rem;
+            border-bottom: 2px solid #eee;
+        }
+
+        .booking-table td {
+            padding: 1.2rem 1rem;
+            border-bottom: 1px solid #eee;
+            font-size: 0.9rem;
+        }
+
+        .client-info span {
+            display: block;
+            font-size: 0.75rem;
+            color: #777;
+        }
+
+        .action-btns {
+            display: flex;
+            gap: 0.5rem;
+        }
+
+        .btn-sm {
+            padding: 0.4rem 0.8rem;
+            font-size: 0.7rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            cursor: pointer;
+            border: none;
+            transition: var(--transition);
+        }
+
+        .btn-delete {
+            background: #fff0f0;
+            color: #ff5252;
+        }
+
+        .btn-delete:hover {
+            background: #ff5252;
+            color: white;
+        }
+
+        .status-select {
+            padding: 0.4rem;
+            border: 1px solid #ddd;
+            font-family: inherit;
+            font-size: 0.8rem;
+            outline: none;
+        }
+
+        #login-section {
+            background: linear-gradient(135deg, #000000 0%, #1a1a1a 100%);
+            position: relative;
+            overflow: hidden;
+            height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        #login-section::before {
+            content: '';
+            position: absolute;
+            width: 200%;
+            height: 200%;
+            background: radial-gradient(circle, rgba(251, 192, 45, 0.05) 0%, transparent 50%);
+            top: -50%;
+            right: -50%;
+            pointer-events: none;
+        }
+
+        .login-card {
+            background: white;
+            padding: 4rem;
+            width: 100%;
+            max-width: 450px;
+            text-align: center;
+            box-shadow: 0 50px 100px rgba(0, 0, 0, 0.5);
+        }
+
+        .login-card h2 {
+            font-size: 2rem;
+            margin-bottom: 1rem;
+            font-weight: 800;
+        }
+
+        .login-card p {
+            color: #777;
+            margin-bottom: 2.5rem;
+            font-size: 0.9rem;
+        }
+    </style>
+</head>
+
+<body class="admin-page">
+    <nav style="background: transparent; border: none;">
+        <div class="container">
+            <a href="index.html" class="logo" style="color: white;">
+                VOLTIO ADMIN
+            </a>
+            <div class="nav-links">
+                <button id="logout-btn" class="btn btn-outline"
+                    style="border-color: var(--dark); color: var(--dark); font-weight: 800; display: none;">CERRAR
+                    SESIÓN</button>
+            </div>
+        </div>
+    </nav>
+
+    <div id="login-section">
+        <div class="login-card reveal">
+            <div style="margin-bottom: 2rem; color: var(--primary);">
+                <svg width="60" height="60" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" />
+                </svg>
+            </div>
+            <h2>Acceso Administrativo</h2>
+            <form id="login-form" autocomplete="off">
+                <div class="form-group" style="text-align: left;">
+                    <label>Usuario</label>
+                    <input type="text" id="admin-user" required placeholder="Usuario admin" autocomplete="off"
+                        style="width: 100%; padding: 1rem; border: 1px solid #ddd; border-radius: 0;">
+                </div>
+                <div class="form-group" style="text-align: left; margin-bottom: 2rem;">
+                    <label>Contraseña</label>
+                    <input type="password" id="admin-password" required placeholder="••••••••" autocomplete="off"
+                        style="width: 100%; padding: 1rem; border: 1px solid #ddd; border-radius: 0;">
+                </div>
+                <button type="submit" class="btn btn-primary"
+                    style="width: 100%; background: var(--dark); color: white; padding: 1.2rem; font-weight: 800;">ENTRAR</button>
+                <p id="login-error" style="color: #ff5252; margin-top: 1rem; font-weight: 700;"></p>
+            </form>
+        </div>
+    </div>
+
+    <div id="admin-dashboard" style="display: none;">
+        <header class="dashboard-header">
+            <div class="container">
+                <h1 style="font-size: 3rem; font-weight: 800; margin-bottom: 1rem;">Panel de Gestión</h1>
+                <p style="opacity: 0.7;">Administración centralizada de servicios.</p>
+            </div>
+        </header>
+
+        <main class="container">
+            <div class="stats-grid">
+                <div class="stat-card reveal">
+                    <h4>Total Solicitudes</h4>
+                    <div class="value" id="stat-total">0</div>
+                </div>
+                <div class="stat-card reveal reveal-delay-1">
+                    <h4>Número WhatsApp</h4>
+                    <div style="margin-top: 1rem; display: flex; gap: 0.5rem; justify-content: center;">
+                        <input type="text" id="wa-number-input"
+                            style="padding: 0.5rem; border: 1px solid #ddd; width: 120px; font-size: 0.8rem; text-align: center;">
+                        <button onclick="saveWhatsAppNumber()" class="btn-sm"
+                            style="background: var(--dark); color: white;">Guardar</button>
+                    </div>
+                </div>
+                <div class="stat-card reveal reveal-delay-2">
+                    <h4>Confirmados</h4>
+                    <div class="value" id="stat-confirmed" style="color: #2b6cb0;">0</div>
+                </div>
+            </div>
+
+            <div class="data-container reveal">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem;">
+                    <h3 style="font-weight: 800;">Solicitudes Recientes</h3>
+                    <button onclick="loadReservations()" class="btn btn-primary"
+                        style="background: var(--primary); color: var(--dark); border-radius: 0; padding: 0.6rem 1.2rem;">Sincronizar
+                        Datos</button>
+                </div>
+
+                <div class="table-responsive">
+                    <table class="booking-table">
+                        <thead>
+                            <tr>
+                                <th>Cliente</th>
+                                <th>Servicio</th>
+                                <th>Fecha Sugerida</th>
+                                <th>Estado</th>
+                                <th>Acciones</th>
+                            </tr>
+                        </thead>
+                        <tbody id="reservations-list">
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script src="js/supabase-config.js"></script>
+    <script src="js/admin.js"></script>
+    <script src="js/scroll-reveal.js"></script>
+</body>
+
+</html>

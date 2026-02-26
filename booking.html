@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Reservar Visita Técnica | Voltio Soluciones</title>
+    <link rel="stylesheet" href="css/style.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/themes/dark.css">
+    <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+    <script src="https://cdn.jsdelivr.net/npm/flatpickr/dist/l10n/es.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <style>
+        .booking-page {
+            background: var(--dark);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            padding: 80px 0;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .booking-page::before {
+            content: '';
+            position: absolute;
+            top: -10%;
+            right: -10%;
+            width: 40%;
+            height: 60%;
+            background: var(--primary);
+            clip-path: polygon(100% 0, 0 0, 100% 100%);
+            opacity: 0.1;
+            z-index: 0;
+        }
+
+        .booking-container {
+            display: grid;
+            grid-template-columns: 1fr 1.2fr;
+            background: white;
+            width: 100%;
+            max-width: 1000px;
+            margin: 0 auto;
+            position: relative;
+            z-index: 1;
+            box-shadow: 0 50px 100px rgba(0, 0, 0, 0.5);
+        }
+
+        .booking-info {
+            background: var(--primary);
+            padding: 4rem;
+            color: var(--dark);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+        }
+
+        .booking-info h2 {
+            font-size: 2.5rem;
+            line-height: 1.1;
+            margin-bottom: 2rem;
+            font-weight: 800;
+        }
+
+        .booking-info p {
+            margin-bottom: 2rem;
+            font-weight: 500;
+            opacity: 0.8;
+        }
+
+        .contact-item {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            margin-bottom: 1rem;
+            font-weight: 700;
+            font-size: 0.9rem;
+        }
+
+        .booking-form-side {
+            padding: 4rem;
+            background: white;
+        }
+
+        .form-header {
+            margin-bottom: 2.5rem;
+        }
+
+        .form-header h3 {
+            font-size: 1.5rem;
+            margin-bottom: 0.5rem;
+            color: var(--dark);
+        }
+
+        .form-header p {
+            color: #777;
+            font-size: 0.9rem;
+        }
+
+        .custom-input-group {
+            position: relative;
+            margin-bottom: 2rem;
+        }
+
+        .custom-input-group label {
+            display: block;
+            font-size: 0.75rem;
+            font-weight: 800;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 0.5rem;
+            color: var(--dark);
+        }
+
+        .custom-input {
+            width: 100%;
+            padding: 1rem 0;
+            border: none;
+            border-bottom: 2px solid #eee;
+            font-family: inherit;
+            font-size: 1rem;
+            outline: none;
+            transition: var(--transition);
+        }
+
+        .custom-input:focus {
+            border-bottom-color: var(--primary);
+        }
+
+        select.custom-input {
+            cursor: pointer;
+            appearance: none;
+        }
+
+        @media (max-width: 768px) {
+            .booking-container {
+                grid-template-columns: 1fr;
+            }
+
+            .booking-info {
+                padding: 3rem 2rem;
+            }
+
+            .booking-form-side {
+                padding: 3rem 2rem;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <nav>
+        <div class="container">
+            <a href="index.html" class="logo">
+                VOLTIO SOLUCIONES
+                <span style="color: var(--primary);">Certificados y Asegurados</span>
+            </a>
+            <div class="nav-links">
+                <a href="index.html" style="color: white; text-decoration: none; font-weight: 600;">VOLVER AL INICIO</a>
+            </div>
+        </div>
+    </nav>
+
+    <div class="booking-page">
+        <div class="container">
+            <div class="booking-container reveal">
+                <div class="booking-info">
+                    <h2>Agenda tu Auditoría Eléctrica</h2>
+                    <p>Un sistema seguro comienza con una revisión profesional. Déjanos tus datos y coordinaremos una
+                        visita técnica.</p>
+                    <div class="contact-item">
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: var(--dark);">
+                            <path
+                                d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l2.19-2.19a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z" />
+                        </svg>
+                        <span>0412-1234567</span>
+                    </div>
+                    <div class="contact-item">
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: var(--dark);">
+                            <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z" />
+                            <polyline points="22,6 12,13 2,6" />
+                        </svg>
+                        <span>citas@voltio.com</span>
+                    </div>
+                </div>
+
+                <div class="booking-form-side">
+                    <div class="form-header">
+                        <h3>Datos de la Solicitud</h3>
+                        <p>Completa los campos requeridos.</p>
+                    </div>
+
+                    <form id="booking-form" autocomplete="off">
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 2rem;">
+                            <div class="custom-input-group">
+                                <label>Nombre o Empresa</label>
+                                <input type="text" id="name" class="custom-input" required
+                                    placeholder="Tu nombre / Empresa" autocomplete="off">
+                            </div>
+                            <div class="custom-input-group">
+                                <label>Teléfono</label>
+                                <input type="tel" id="client_phone" class="custom-input" required
+                                    placeholder="04XX-XXXXXXX" autocomplete="off">
+                            </div>
+                        </div>
+
+                        <div class="custom-input-group">
+                            <label>Tipo de Servicio</label>
+                            <select id="service" class="custom-input" required>
+                                <option value="" disabled selected>Selecciona una opción</option>
+                                <option value="Tablero">Sustitución de Tablero</option>
+                                <option value="Iluminacion">Iluminación LED / Lámparas</option>
+                                <option value="Falla">Reparación de Falla Crítica</option>
+                                <option value="Cableado">Reemplazo de Cableado</option>
+                                <option value="Otro">Otros Trabajos</option>
+                            </select>
+                        </div>
+
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 2rem;">
+                            <div class="custom-input-group">
+                                <label>Fecha Sugerida</label>
+                                <input type="text" id="date" class="custom-input" required
+                                    placeholder="Selecciona una fecha">
+                            </div>
+                            <div class="custom-input-group">
+                                <label>Hora Aproximada</label>
+                                <input type="time" id="time" class="custom-input" required>
+                            </div>
+                        </div>
+
+                        <button type="submit" class="btn btn-primary"
+                            style="width: 100%; border-radius: 0; padding: 1.2rem; background: var(--dark); color: white;"
+                            id="submit-btn">ENVIAR SOLICITUD</button>
+                        <p id="response-msg" style="margin-top: 1.5rem; text-align: center; font-weight: 700;"></p>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="js/supabase-config.js"></script>
+    <script src="js/booking.js"></script>
+    <script src="js/scroll-reveal.js"></script>
+</body>
+
+</html>
