@@ -189,6 +189,7 @@ nav .container {
     flex: 1;
     background-size: cover;
     background-position: center;
+    background-repeat: no-repeat;
     position: relative;
 }
 
@@ -308,7 +309,9 @@ nav .container {
     }
 
     .about-split {
+        display: flex;
         flex-direction: column;
+        min-height: auto;
     }
 
     .about-yellow {
@@ -340,7 +343,20 @@ nav .container {
     }
 
     .about-image {
-        height: 300px;
+        display: block;
+        height: 400px;
+        width: 100%;
+        background-attachment: scroll;
+    }
+
+    .reveal-left,
+    .reveal-right {
+        transform: translateY(30px) !important;
+    }
+
+    .reveal-left.active,
+    .reveal-right.active {
+        transform: translateY(0) !important;
     }
 
     .services-dark,
